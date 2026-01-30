@@ -28,6 +28,7 @@ import type {
 import type { AssistantMessageEventStream } from "../utils/event-stream.js";
 import { parseStreamingJson } from "../utils/json-parse.js";
 import { sanitizeSurrogates } from "../utils/sanitize-unicode.js";
+import { isWebSearchTool } from "../utils/web-search.js";
 import { transformMessages } from "./transform-messages.js";
 
 // =============================================================================
@@ -245,13 +246,30 @@ export function convertResponsesMessages<TApi extends Api>(
 
 export function convertResponsesTools(tools: Tool[], options?: ConvertResponsesToolsOptions): OpenAITool[] {
 	const strict = options?.strict === undefined ? false : options.strict;
-	return tools.map((tool) => ({
-		type: "function",
-		name: tool.name,
-		description: tool.description,
-		parameters: tool.parameters as any, // TypeBox already generates JSON Schema
-		strict,
-	}));
+	const converted: OpenAITool[] = [];
+	let webSearchEnabled = false;
+
+	for (const tool of tools) {
+		if (isWebSearchTool(tool)) {
+			webSearchEnabled = true;
+			continue;
+		}
+		converted.push({
+			type: "function",
+			name: tool.name,
+			description: tool.description,
+			parameters: tool.parameters as any, // TypeBox already generates JSON Schema
+			strict,
+		});
+	}
+
+	if (webSearchEnabled) {
+		converted.push({
+			type: "web_search",
+		});
+	}
+
+	return converted;
 }
 
 // =============================================================================

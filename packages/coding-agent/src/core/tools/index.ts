@@ -26,6 +26,7 @@ export {
 	truncateLine,
 	truncateTail,
 } from "./truncate.js";
+export { createWebSearchTool, webSearchTool } from "./web-search.js";
 export { createWriteTool, type WriteOperations, type WriteToolOptions, writeTool } from "./write.js";
 
 import type { AgentTool } from "@mariozechner/pi-agent-core";
@@ -35,6 +36,7 @@ import { createFindTool, findTool } from "./find.js";
 import { createGrepTool, grepTool } from "./grep.js";
 import { createLsTool, lsTool } from "./ls.js";
 import { createReadTool, type ReadToolOptions, readTool } from "./read.js";
+import { createWebSearchTool, webSearchTool } from "./web-search.js";
 import { createWriteTool, writeTool } from "./write.js";
 
 /** Tool type (AgentTool from pi-ai) */
@@ -55,6 +57,7 @@ export const allTools = {
 	grep: grepTool,
 	find: findTool,
 	ls: lsTool,
+	web_search: webSearchTool,
 };
 
 export type ToolName = keyof typeof allTools;
@@ -97,5 +100,6 @@ export function createAllTools(cwd: string, options?: ToolsOptions): Record<Tool
 		grep: createGrepTool(cwd),
 		find: createFindTool(cwd),
 		ls: createLsTool(cwd),
+		web_search: createWebSearchTool(),
 	};
 }

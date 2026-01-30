@@ -26,6 +26,7 @@ import {
 	createLsTool,
 	createReadOnlyTools,
 	createReadTool,
+	createWebSearchTool,
 	createWriteTool,
 	editTool,
 	findTool,
@@ -35,6 +36,7 @@ import {
 	readTool,
 	type Tool,
 	type ToolName,
+	webSearchTool,
 	writeTool,
 } from "./tools/index.js";
 
@@ -103,6 +105,7 @@ export {
 	grepTool,
 	findTool,
 	lsTool,
+	webSearchTool,
 	codingTools,
 	readOnlyTools,
 	allTools as allBuiltInTools,
@@ -116,6 +119,7 @@ export {
 	createGrepTool,
 	createFindTool,
 	createLsTool,
+	createWebSearchTool,
 };
 
 // Helper Functions

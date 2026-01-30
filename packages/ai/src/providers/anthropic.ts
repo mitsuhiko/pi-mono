@@ -26,6 +26,7 @@ import type {
 import { AssistantMessageEventStream } from "../utils/event-stream.js";
 import { parseStreamingJson } from "../utils/json-parse.js";
 import { sanitizeSurrogates } from "../utils/sanitize-unicode.js";
+import { isWebSearchTool } from "../utils/web-search.js";
 
 import { adjustMaxTokensForThinking, buildBaseOptions } from "./simple-options.js";
 import { transformMessages } from "./transform-messages.js";
@@ -685,13 +686,23 @@ function convertMessages(
 	return params;
 }
 
-function convertTools(tools: Tool[], isOAuthToken: boolean): Anthropic.Messages.Tool[] {
+function convertTools(tools: Tool[], isOAuthToken: boolean): Anthropic.Messages.ToolUnion[] {
 	if (!tools) return [];
 
-	return tools.map((tool) => {
+	const converted: Anthropic.Messages.ToolUnion[] = [];
+
+	for (const tool of tools) {
+		if (isWebSearchTool(tool)) {
+			converted.push({
+				name: "web_search",
+				type: "web_search_20250305",
+			});
+			continue;
+		}
+
 		const jsonSchema = tool.parameters as any; // TypeBox already generates JSON Schema
 
-		return {
+		converted.push({
 			name: isOAuthToken ? toClaudeCodeName(tool.name) : tool.name,
 			description: tool.description,
 			input_schema: {
@@ -699,8 +710,10 @@ function convertTools(tools: Tool[], isOAuthToken: boolean): Anthropic.Messages.
 				properties: jsonSchema.properties || {},
 				required: jsonSchema.required || [],
 			},
-		};
-	});
+		});
+	}
+
+	return converted;
 }
 
 function mapStopReason(reason: Anthropic.Messages.StopReason | string): StopReason {

@@ -5,6 +5,7 @@
 ### Added
 
 - Added `ctx.getSystemPrompt()` to extension context for accessing the current effective system prompt ([#1098](https://github.com/badlogic/pi-mono/pull/1098) by [@kaofelix](https://github.com/kaofelix))
+- Added `web_search` as a built-in tool for enabling provider-side web search on supported models.
 
 ## [0.50.5] - 2026-01-30
 

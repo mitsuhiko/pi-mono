@@ -14,6 +14,7 @@ const toolDescriptions: Record<string, string> = {
 	grep: "Search file contents for patterns (respects .gitignore)",
 	find: "Find files by glob pattern (respects .gitignore)",
 	ls: "List directory contents",
+	web_search: "Enable server-side web search for supported models",
 };
 
 export interface BuildSystemPromptOptions {

@@ -19,6 +19,7 @@ import type {
 	StreamOptions,
 } from "../types.js";
 import { AssistantMessageEventStream } from "../utils/event-stream.js";
+import { hasWebSearchTool } from "../utils/web-search.js";
 import { convertResponsesMessages, convertResponsesTools, processResponsesStream } from "./openai-responses-shared.js";
 import { buildBaseOptions, clampReasoning } from "./simple-options.js";
 
@@ -134,7 +135,15 @@ export const streamOpenAICodexResponses: StreamFunction<"openai-codex-responses"
 			const accountId = extractAccountId(apiKey);
 			const body = buildRequestBody(model, context, options);
 			options?.onPayload?.(body);
-			const headers = buildHeaders(model.headers, options?.headers, accountId, apiKey, options?.sessionId);
+			const webSearchEnabled = hasWebSearchTool(context.tools);
+			const headers = buildHeaders(
+				model.headers,
+				options?.headers,
+				accountId,
+				apiKey,
+				options?.sessionId,
+				webSearchEnabled,
+			);
 			const bodyJson = JSON.stringify(body);
 
 			// Fetch with retry logic for rate limits and transient errors
@@ -426,13 +435,15 @@ function buildHeaders(
 	additionalHeaders: Record<string, string> | undefined,
 	accountId: string,
 	token: string,
-	sessionId?: string,
+	sessionId: string | undefined,
+	webSearchEnabled: boolean,
 ): Headers {
 	const headers = new Headers(initHeaders);
 	headers.set("Authorization", `Bearer ${token}`);
 	headers.set("chatgpt-account-id", accountId);
 	headers.set("OpenAI-Beta", "responses=experimental");
 	headers.set("originator", "pi");
+	headers.set("x-oai-web-search-eligible", webSearchEnabled ? "true" : "false");
 	const userAgent = _os ? `pi (${_os.platform()} ${_os.release()}; ${_os.arch()})` : "pi (browser)";
 	headers.set("User-Agent", userAgent);
 	headers.set("accept", "text/event-stream");

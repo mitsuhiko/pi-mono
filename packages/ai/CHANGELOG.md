@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added web search server tool support for Anthropic and OpenAI Codex Responses when enabling the `web_search` tool.
+
 ## [0.50.5] - 2026-01-30
 
 ## [0.50.4] - 2026-01-30
