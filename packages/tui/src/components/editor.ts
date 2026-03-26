@@ -861,7 +861,7 @@ export class Editor implements Component, Focusable {
 		}
 
 		let currentWidth = 0;
-		for (const part of segmenter.segment(text)) {
+		for (const part of baseSegmenter.segment(text)) {
 			const partWidth = visibleWidth(part.segment);
 			if (currentWidth + partWidth > visualCol) {
 				return part.index;
