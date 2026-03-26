@@ -55,6 +55,7 @@ export type { SandboxRuntimeProvider } from "./components/sandbox/SandboxRuntime
 export { ThinkingBlock } from "./components/ThinkingBlock.js";
 export { ApiKeyPromptDialog } from "./dialogs/ApiKeyPromptDialog.js";
 export { AttachmentOverlay } from "./dialogs/AttachmentOverlay.js";
+export { CustomProviderDialog } from "./dialogs/CustomProviderDialog.js";
 // Dialogs
 export { ModelSelector } from "./dialogs/ModelSelector.js";
 export { PersistentStorageDialog } from "./dialogs/PersistentStorageDialog.js";

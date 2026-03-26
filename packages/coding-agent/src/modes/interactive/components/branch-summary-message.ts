@@ -1,7 +1,7 @@
 import { Box, Markdown, type MarkdownTheme, Spacer, Text } from "@mariozechner/pi-tui";
 import type { BranchSummaryMessage } from "../../../core/messages.js";
 import { getMarkdownTheme, theme } from "../theme/theme.js";
-import { editorKey } from "./keybinding-hints.js";
+import { keyText } from "./keybinding-hints.js";
 
 /**
  * Component that renders a branch summary message with collapsed/expanded state.
@@ -47,7 +47,7 @@ export class BranchSummaryMessageComponent extends Box {
 			this.addChild(
 				new Text(
 					theme.fg("customMessageText", "Branch summary (") +
-						theme.fg("dim", editorKey("expandTools")) +
+						theme.fg("dim", keyText("app.tools.expand")) +
 						theme.fg("customMessageText", " to expand)"),
 					0,
 					0,

@@ -14,6 +14,7 @@
  * built-in `grep` tool in src/core/tools/grep.ts for a more complete implementation.
  */
 
+import { mkdtemp, writeFile } from "node:fs/promises";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import {
 	DEFAULT_MAX_BYTES,
@@ -21,11 +22,11 @@ import {
 	formatSize,
 	type TruncationResult,
 	truncateHead,
+	withFileMutationQueue,
 } from "@mariozechner/pi-coding-agent";
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { execSync } from "child_process";
-import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -108,9 +109,11 @@ export default function (pi: ExtensionAPI) {
 
 			if (truncation.truncated) {
 				// Save full output to a temp file so LLM can access it if needed
-				const tempDir = mkdtempSync(join(tmpdir(), "pi-rg-"));
+				const tempDir = await mkdtemp(join(tmpdir(), "pi-rg-"));
 				const tempFile = join(tempDir, "output.txt");
-				writeFileSync(tempFile, output);
+				await withFileMutationQueue(tempFile, async () => {
+					await writeFile(tempFile, output, "utf8");
+				});
 
 				details.truncation = truncation;
 				details.fullOutputPath = tempFile;
@@ -132,7 +135,7 @@ export default function (pi: ExtensionAPI) {
 		},
 
 		// Custom rendering of the tool call (shown before/during execution)
-		renderCall(args, theme) {
+		renderCall(args, theme, _context) {
 			let text = theme.fg("toolTitle", theme.bold("rg "));
 			text += theme.fg("accent", `"${args.pattern}"`);
 			if (args.path) {
@@ -145,7 +148,7 @@ export default function (pi: ExtensionAPI) {
 		},
 
 		// Custom rendering of the tool result
-		renderResult(result, { expanded, isPartial }, theme) {
+		renderResult(result, { expanded, isPartial }, theme, _context) {
 			const details = result.details as RgDetails | undefined;
 
 			// Handle streaming/partial results

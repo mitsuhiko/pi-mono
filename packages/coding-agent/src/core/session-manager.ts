@@ -36,6 +36,7 @@ export interface SessionHeader {
 }
 
 export interface NewSessionOptions {
+	id?: string;
 	parentSession?: string;
 }
 
@@ -417,9 +418,9 @@ export function buildSessionContext(
  * Compute the default session directory for a cwd.
  * Encodes cwd into a safe directory name under ~/.pi/agent/sessions/.
  */
-function getDefaultSessionDir(cwd: string): string {
+export function getDefaultSessionDir(cwd: string, agentDir: string = getDefaultAgentDir()): string {
 	const safePath = `--${cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}--`;
-	const sessionDir = join(getDefaultAgentDir(), "sessions", safePath);
+	const sessionDir = join(agentDir, "sessions", safePath);
 	if (!existsSync(sessionDir)) {
 		mkdirSync(sessionDir, { recursive: true });
 	}
@@ -564,12 +565,10 @@ async function buildSessionInfo(filePath: string): Promise<SessionInfo | null> {
 		let name: string | undefined;
 
 		for (const entry of entries) {
-			// Extract session name (use latest)
+			// Extract session name (use latest, including explicit clears)
 			if (entry.type === "session_info") {
 				const infoEntry = entry as SessionInfoEntry;
-				if (infoEntry.name) {
-					name = infoEntry.name.trim();
-				}
+				name = infoEntry.name?.trim() || undefined;
 			}
 
 			if (entry.type !== "message") continue;
@@ -721,7 +720,7 @@ export class SessionManager {
 	}
 
 	newSession(options?: NewSessionOptions): string | undefined {
-		this.sessionId = randomUUID();
+		this.sessionId = options?.id ?? randomUUID();
 		const timestamp = new Date().toISOString();
 		const header: SessionHeader = {
 			type: "session",
@@ -912,12 +911,13 @@ export class SessionManager {
 
 	/** Get the current session name from the latest session_info entry, if any. */
 	getSessionName(): string | undefined {
-		// Walk entries in reverse to find the latest session_info with a name
+		// Walk entries in reverse to find the latest session_info entry.
+		// Empty names explicitly clear the session title.
 		const entries = this.getEntries();
 		for (let i = entries.length - 1; i >= 0; i--) {
 			const entry = entries[i];
-			if (entry.type === "session_info" && entry.name) {
-				return entry.name;
+			if (entry.type === "session_info") {
+				return entry.name?.trim() || undefined;
 			}
 		}
 		return undefined;

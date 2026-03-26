@@ -57,6 +57,10 @@ describe("ModelRegistry", () => {
 		return registry.getAll().filter((m) => m.provider === provider);
 	}
 
+	function toShPath(value: string): string {
+		return value.replace(/\\/g, "/").replace(/"/g, '\\"');
+	}
+
 	/** Create a baseUrl-only override (no custom models) */
 	function overrideConfig(baseUrl: string, headers?: Record<string, string>) {
 		return { baseUrl, ...(headers && { headers }) };
@@ -236,6 +240,125 @@ describe("ModelRegistry", () => {
 			for (const model of anthropicModels) {
 				expect(model.baseUrl).toBe("https://merged-proxy.example.com/v1");
 			}
+		});
+
+		test("provider-level compat applies to custom models", () => {
+			writeRawModelsJson({
+				demo: {
+					baseUrl: "https://example.com/v1",
+					apiKey: "DEMO_KEY",
+					api: "openai-completions",
+					compat: {
+						supportsUsageInStreaming: false,
+						maxTokensField: "max_tokens",
+					},
+					models: [
+						{
+							id: "demo-model",
+							reasoning: false,
+							input: ["text"],
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+							contextWindow: 1000,
+							maxTokens: 100,
+						},
+					],
+				},
+			});
+
+			const registry = new ModelRegistry(authStorage, modelsJsonPath);
+			const compat = registry.find("demo", "demo-model")?.compat as OpenAICompletionsCompat | undefined;
+
+			expect(compat?.supportsUsageInStreaming).toBe(false);
+			expect(compat?.maxTokensField).toBe("max_tokens");
+		});
+
+		test("model-level compat overrides provider-level compat for custom models", () => {
+			writeRawModelsJson({
+				demo: {
+					baseUrl: "https://example.com/v1",
+					apiKey: "DEMO_KEY",
+					api: "openai-completions",
+					compat: {
+						supportsUsageInStreaming: false,
+						maxTokensField: "max_tokens",
+					},
+					models: [
+						{
+							id: "demo-model",
+							reasoning: false,
+							input: ["text"],
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+							contextWindow: 1000,
+							maxTokens: 100,
+							compat: {
+								supportsUsageInStreaming: true,
+								maxTokensField: "max_completion_tokens",
+							},
+						},
+					],
+				},
+			});
+
+			const registry = new ModelRegistry(authStorage, modelsJsonPath);
+			const compat = registry.find("demo", "demo-model")?.compat as OpenAICompletionsCompat | undefined;
+
+			expect(compat?.supportsUsageInStreaming).toBe(true);
+			expect(compat?.maxTokensField).toBe("max_completion_tokens");
+		});
+
+		test("provider-level compat applies to built-in models", () => {
+			writeRawModelsJson({
+				openrouter: {
+					compat: {
+						supportsUsageInStreaming: false,
+						supportsStrictMode: false,
+					},
+				},
+			});
+
+			const registry = new ModelRegistry(authStorage, modelsJsonPath);
+			const models = getModelsForProvider(registry, "openrouter");
+
+			expect(models.length).toBeGreaterThan(0);
+			for (const model of models) {
+				const compat = model.compat as OpenAICompletionsCompat | undefined;
+				expect(compat?.supportsUsageInStreaming).toBe(false);
+				expect(compat?.supportsStrictMode).toBe(false);
+			}
+		});
+
+		test("compat schema accepts reasoningEffortMap and supportsStrictMode", () => {
+			writeRawModelsJson({
+				demo: {
+					baseUrl: "https://example.com/v1",
+					apiKey: "DEMO_KEY",
+					api: "openai-completions",
+					models: [
+						{
+							id: "demo-model",
+							reasoning: true,
+							input: ["text"],
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+							contextWindow: 1000,
+							maxTokens: 100,
+							compat: {
+								reasoningEffortMap: {
+									minimal: "default",
+									high: "max",
+								},
+								supportsStrictMode: false,
+							},
+						},
+					],
+				},
+			});
+
+			const registry = new ModelRegistry(authStorage, modelsJsonPath);
+			const compat = registry.find("demo", "demo-model")?.compat as OpenAICompletionsCompat | undefined;
+
+			expect(registry.getError()).toBeUndefined();
+			expect(compat?.reasoningEffortMap).toEqual({ minimal: "default", high: "max" });
+			expect(compat?.supportsStrictMode).toBe(false);
 		});
 
 		test("model-level baseUrl overrides provider-level baseUrl for custom models", () => {
@@ -584,6 +707,65 @@ describe("ModelRegistry", () => {
 	});
 
 	describe("dynamic provider lifecycle", () => {
+		test("failed registerProvider does not persist invalid streamSimple config", () => {
+			const registry = new ModelRegistry(authStorage, modelsJsonPath);
+
+			expect(() =>
+				registry.registerProvider("broken-provider", {
+					streamSimple: (() => {
+						throw new Error("should not run");
+					}) as any,
+				}),
+			).toThrow('Provider broken-provider: "api" is required when registering streamSimple.');
+
+			expect(() => registry.refresh()).not.toThrow();
+		});
+
+		test("failed registerProvider does not remove existing provider models", () => {
+			const registry = new ModelRegistry(authStorage, modelsJsonPath);
+
+			registry.registerProvider("demo-provider", {
+				baseUrl: "https://provider.test/v1",
+				apiKey: "TEST_KEY",
+				api: "openai-completions",
+				models: [
+					{
+						id: "demo-model",
+						name: "Demo Model",
+						reasoning: false,
+						input: ["text"],
+						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+						contextWindow: 128000,
+						maxTokens: 4096,
+					},
+				],
+			});
+
+			expect(registry.find("demo-provider", "demo-model")).toBeDefined();
+
+			expect(() =>
+				registry.registerProvider("demo-provider", {
+					baseUrl: "https://provider.test/v2",
+					apiKey: "TEST_KEY",
+					models: [
+						{
+							id: "broken-model",
+							name: "Broken Model",
+							reasoning: false,
+							input: ["text"],
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+							contextWindow: 128000,
+							maxTokens: 4096,
+						},
+					],
+				}),
+			).toThrow('Provider demo-provider, model broken-model: no "api" specified.');
+
+			expect(registry.find("demo-provider", "demo-model")).toBeDefined();
+			expect(() => registry.refresh()).not.toThrow();
+			expect(registry.find("demo-provider", "demo-model")).toBeDefined();
+		});
+
 		test("unregisterProvider removes custom OAuth provider and restores built-in OAuth provider", () => {
 			const registry = new ModelRegistry(authStorage, modelsJsonPath);
 
@@ -778,7 +960,8 @@ describe("ModelRegistry", () => {
 				const counterFile = join(tempDir, "counter");
 				writeFileSync(counterFile, "0");
 
-				const command = `!sh -c 'count=$(cat ${counterFile}); echo $((count + 1)) > ${counterFile}; echo "key-value"'`;
+				const counterPath = toShPath(counterFile);
+				const command = `!sh -c 'count=$(cat "${counterPath}"); echo $((count + 1)) > "${counterPath}"; echo "key-value"'`;
 				writeRawModelsJson({
 					"custom-provider": providerWithApiKey(command),
 				});
@@ -799,7 +982,8 @@ describe("ModelRegistry", () => {
 				const counterFile = join(tempDir, "counter");
 				writeFileSync(counterFile, "0");
 
-				const command = `!sh -c 'count=$(cat ${counterFile}); echo $((count + 1)) > ${counterFile}; echo "key-value"'`;
+				const counterPath = toShPath(counterFile);
+				const command = `!sh -c 'count=$(cat "${counterPath}"); echo $((count + 1)) > "${counterPath}"; echo "key-value"'`;
 				writeRawModelsJson({
 					"custom-provider": providerWithApiKey(command),
 				});
@@ -820,7 +1004,8 @@ describe("ModelRegistry", () => {
 				const counterFile = join(tempDir, "counter");
 				writeFileSync(counterFile, "0");
 
-				const command = `!sh -c 'count=$(cat ${counterFile}); echo $((count + 1)) > ${counterFile}; echo "key-value"'`;
+				const counterPath = toShPath(counterFile);
+				const command = `!sh -c 'count=$(cat "${counterPath}"); echo $((count + 1)) > "${counterPath}"; echo "key-value"'`;
 				writeRawModelsJson({
 					"custom-provider": providerWithApiKey(command),
 				});
@@ -856,7 +1041,8 @@ describe("ModelRegistry", () => {
 				const counterFile = join(tempDir, "counter");
 				writeFileSync(counterFile, "0");
 
-				const command = `!sh -c 'count=$(cat ${counterFile}); echo $((count + 1)) > ${counterFile}; exit 1'`;
+				const counterPath = toShPath(counterFile);
+				const command = `!sh -c 'count=$(cat "${counterPath}"); echo $((count + 1)) > "${counterPath}"; exit 1'`;
 				writeRawModelsJson({
 					"custom-provider": providerWithApiKey(command),
 				});

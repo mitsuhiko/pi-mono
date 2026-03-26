@@ -663,6 +663,27 @@ function matchesModifyOtherKeys(data: string, expectedKeycode: number, expectedM
 	return parsed.codepoint === expectedKeycode && parsed.modifier === expectedModifier;
 }
 
+function isWindowsTerminalSession(): boolean {
+	return (
+		Boolean(process.env.WT_SESSION) && !process.env.SSH_CONNECTION && !process.env.SSH_CLIENT && !process.env.SSH_TTY
+	);
+}
+
+/**
+ * Raw 0x08 (BS) is ambiguous in legacy terminals.
+ *
+ * - Windows Terminal uses it for Ctrl+Backspace.
+ * - Some legacy terminals and tmux setups send it for plain Backspace.
+ *
+ * Prefer explicit Kitty / CSI-u / modifyOtherKeys sequences whenever they are
+ * available. Fall back to a Windows Terminal heuristic only for raw BS bytes.
+ */
+function matchesRawBackspace(data: string, expectedModifier: number): boolean {
+	if (data === "\x7f") return expectedModifier === 0;
+	if (data !== "\x08") return false;
+	return isWindowsTerminalSession() ? expectedModifier === MODIFIERS.ctrl : expectedModifier === 0;
+}
+
 // =============================================================================
 // Generic Key Matching
 // =============================================================================
@@ -751,7 +772,11 @@ export function matchesKey(data: string, keyId: KeyId): boolean {
 		case "escape":
 		case "esc":
 			if (modifier !== 0) return false;
-			return data === "\x1b" || matchesKittySequence(data, CODEPOINTS.escape, 0);
+			return (
+				data === "\x1b" ||
+				matchesKittySequence(data, CODEPOINTS.escape, 0) ||
+				matchesModifyOtherKeys(data, CODEPOINTS.escape, 0)
+			);
 
 		case "space":
 			if (!_kittyProtocolActive) {
@@ -763,18 +788,32 @@ export function matchesKey(data: string, keyId: KeyId): boolean {
 				}
 			}
 			if (modifier === 0) {
-				return data === " " || matchesKittySequence(data, CODEPOINTS.space, 0);
+				return (
+					data === " " ||
+					matchesKittySequence(data, CODEPOINTS.space, 0) ||
+					matchesModifyOtherKeys(data, CODEPOINTS.space, 0)
+				);
 			}
-			return matchesKittySequence(data, CODEPOINTS.space, modifier);
+			return (
+				matchesKittySequence(data, CODEPOINTS.space, modifier) ||
+				matchesModifyOtherKeys(data, CODEPOINTS.space, modifier)
+			);
 
 		case "tab":
 			if (shift && !ctrl && !alt) {
-				return data === "\x1b[Z" || matchesKittySequence(data, CODEPOINTS.tab, MODIFIERS.shift);
+				return (
+					data === "\x1b[Z" ||
+					matchesKittySequence(data, CODEPOINTS.tab, MODIFIERS.shift) ||
+					matchesModifyOtherKeys(data, CODEPOINTS.tab, MODIFIERS.shift)
+				);
 			}
 			if (modifier === 0) {
 				return data === "\t" || matchesKittySequence(data, CODEPOINTS.tab, 0);
 			}
-			return matchesKittySequence(data, CODEPOINTS.tab, modifier);
+			return (
+				matchesKittySequence(data, CODEPOINTS.tab, modifier) ||
+				matchesModifyOtherKeys(data, CODEPOINTS.tab, modifier)
+			);
 
 		case "enter":
 		case "return":
@@ -837,12 +876,32 @@ export function matchesKey(data: string, keyId: KeyId): boolean {
 				if (data === "\x1b\x7f" || data === "\x1b\b") {
 					return true;
 				}
-				return matchesKittySequence(data, CODEPOINTS.backspace, MODIFIERS.alt);
+				return (
+					matchesKittySequence(data, CODEPOINTS.backspace, MODIFIERS.alt) ||
+					matchesModifyOtherKeys(data, CODEPOINTS.backspace, MODIFIERS.alt)
+				);
+			}
+			if (ctrl && !alt && !shift) {
+				// Legacy raw 0x08 is ambiguous: it can be Ctrl+Backspace on Windows
+				// Terminal or plain Backspace on other terminals, while also
+				// overlapping with Ctrl+H.
+				if (matchesRawBackspace(data, MODIFIERS.ctrl)) return true;
+				return (
+					matchesKittySequence(data, CODEPOINTS.backspace, MODIFIERS.ctrl) ||
+					matchesModifyOtherKeys(data, CODEPOINTS.backspace, MODIFIERS.ctrl)
+				);
 			}
 			if (modifier === 0) {
-				return data === "\x7f" || data === "\x08" || matchesKittySequence(data, CODEPOINTS.backspace, 0);
+				return (
+					matchesRawBackspace(data, 0) ||
+					matchesKittySequence(data, CODEPOINTS.backspace, 0) ||
+					matchesModifyOtherKeys(data, CODEPOINTS.backspace, 0)
+				);
 			}
-			return matchesKittySequence(data, CODEPOINTS.backspace, modifier);
+			return (
+				matchesKittySequence(data, CODEPOINTS.backspace, modifier) ||
+				matchesModifyOtherKeys(data, CODEPOINTS.backspace, modifier)
+			);
 
 		case "insert":
 			if (modifier === 0) {
@@ -1158,7 +1217,8 @@ export function parseKey(data: string): string | undefined {
 	if (data === "\r" || (!_kittyProtocolActive && data === "\n") || data === "\x1bOM") return "enter";
 	if (data === "\x00") return "ctrl+space";
 	if (data === " ") return "space";
-	if (data === "\x7f" || data === "\x08") return "backspace";
+	if (data === "\x7f") return "backspace";
+	if (data === "\x08") return isWindowsTerminalSession() ? "ctrl+backspace" : "backspace";
 	if (data === "\x1b[Z") return "shift+tab";
 	if (!_kittyProtocolActive && data === "\x1b\r") return "alt+enter";
 	if (!_kittyProtocolActive && data === "\x1b ") return "alt+space";

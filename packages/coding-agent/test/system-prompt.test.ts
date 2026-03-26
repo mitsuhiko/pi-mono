@@ -25,8 +25,14 @@ describe("buildSystemPrompt", () => {
 	});
 
 	describe("default tools", () => {
-		test("includes all default tools", () => {
+		test("includes all default tools when snippets are provided", () => {
 			const prompt = buildSystemPrompt({
+				toolSnippets: {
+					read: "Read file contents",
+					bash: "Execute bash commands",
+					edit: "Make surgical edits",
+					write: "Create or overwrite files",
+				},
 				contextFiles: [],
 				skills: [],
 			});
@@ -39,7 +45,7 @@ describe("buildSystemPrompt", () => {
 	});
 
 	describe("custom tool snippets", () => {
-		test("includes custom tools in available tools section", () => {
+		test("includes custom tools in available tools section when promptSnippet is provided", () => {
 			const prompt = buildSystemPrompt({
 				selectedTools: ["read", "dynamic_tool"],
 				toolSnippets: {
@@ -50,6 +56,16 @@ describe("buildSystemPrompt", () => {
 			});
 
 			expect(prompt).toContain("- dynamic_tool: Run dynamic test behavior");
+		});
+
+		test("omits custom tools from available tools section when promptSnippet is not provided", () => {
+			const prompt = buildSystemPrompt({
+				selectedTools: ["read", "dynamic_tool"],
+				contextFiles: [],
+				skills: [],
+			});
+
+			expect(prompt).not.toContain("dynamic_tool");
 		});
 	});
 

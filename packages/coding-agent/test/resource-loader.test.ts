@@ -9,6 +9,7 @@ import { DefaultResourceLoader } from "../src/core/resource-loader.js";
 import { SessionManager } from "../src/core/session-manager.js";
 import { SettingsManager } from "../src/core/settings-manager.js";
 import type { Skill } from "../src/core/skills.js";
+import { createSyntheticSourceInfo } from "../src/core/source-info.js";
 
 describe("DefaultResourceLoader", () => {
 	let tempDir: string;
@@ -194,7 +195,7 @@ Project skill`,
 
 			const extensionsResult = loader.getExtensions();
 			expect(extensionsResult.extensions).toHaveLength(2);
-			expect(extensionsResult.errors.some((e) => e.error.includes('Command "/deploy" conflicts'))).toBe(true);
+			expect(extensionsResult.errors.some((e) => e.error.includes('Command "/deploy" conflicts'))).toBe(false);
 
 			const sessionManager = SessionManager.inMemory();
 			const authStorage = AuthStorage.create(join(tempDir, "auth.json"));
@@ -207,12 +208,18 @@ Project skill`,
 				modelRegistry,
 			);
 
-			expect(runner.getCommand("deploy")?.description).toBe("project deploy");
+			expect(runner.getCommand("deploy:1")?.description).toBe("project deploy");
+			expect(runner.getCommand("deploy:2")?.description).toBe("user deploy");
 			expect(runner.getCommand("project-only")?.description).toBe("project only");
 			expect(runner.getCommand("user-only")?.description).toBe("user only");
 
-			const commandNames = runner.getRegisteredCommands().map((c) => c.name);
-			expect(commandNames.filter((name) => name === "deploy")).toHaveLength(1);
+			const commands = runner.getRegisteredCommands();
+			expect(commands.map((command) => command.invocationName)).toEqual([
+				"deploy:1",
+				"project-only",
+				"deploy:2",
+				"user-only",
+			]);
 		});
 
 		it("should honor overrides for auto-discovered resources", async () => {
@@ -346,14 +353,16 @@ Extra prompt content`,
 			});
 
 			const { skills } = loader.getSkills();
-			expect(skills.some((skill) => skill.name === "extra-skill")).toBe(true);
+			const loadedSkill = skills.find((skill) => skill.name === "extra-skill");
+			expect(loadedSkill).toBeDefined();
+			expect(loadedSkill?.sourceInfo?.source).toBe("extension:extra");
+			expect(loadedSkill?.sourceInfo?.path).toBe(skillPath);
 
 			const { prompts } = loader.getPrompts();
-			expect(prompts.some((prompt) => prompt.name === "extra")).toBe(true);
-
-			const metadata = loader.getPathMetadata();
-			expect(metadata.get(skillPath)?.source).toBe("extension:extra");
-			expect(metadata.get(promptPath)?.source).toBe("extension:extra");
+			const loadedPrompt = prompts.find((prompt) => prompt.name === "extra");
+			expect(loadedPrompt).toBeDefined();
+			expect(loadedPrompt?.sourceInfo?.source).toBe("extension:extra");
+			expect(loadedPrompt?.sourceInfo?.path).toBe(promptPath);
 		});
 	});
 
@@ -409,7 +418,7 @@ Content`,
 				description: "Injected skill",
 				filePath: "/fake/path",
 				baseDir: "/fake",
-				source: "custom",
+				sourceInfo: createSyntheticSourceInfo("/fake/path", { source: "custom" }),
 				disableModelInvocation: false,
 			};
 			const loader = new DefaultResourceLoader({
@@ -548,7 +557,8 @@ export default function(pi: ExtensionAPI) {
 				modelRegistry,
 			);
 
-			expect(runner.getCommand("deploy")?.description).toBe("explicit command");
+			expect(runner.getCommand("deploy:1")?.description).toBe("explicit command");
+			expect(runner.getCommand("deploy:2")?.description).toBe("global command");
 			expect(runner.getToolDefinition("duplicate-tool")?.description).toBe("explicit tool");
 		});
 	});

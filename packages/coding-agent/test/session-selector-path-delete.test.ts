@@ -1,4 +1,4 @@
-import { DEFAULT_EDITOR_KEYBINDINGS, EditorKeybindingsManager, setEditorKeybindings } from "@mariozechner/pi-tui";
+import { setKeybindings } from "@mariozechner/pi-tui";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { KeybindingsManager } from "../src/core/keybindings.js";
 import type { SessionInfo } from "../src/core/session-manager.js";
@@ -45,11 +45,11 @@ const CTRL_D = "\x04";
 const CTRL_BACKSPACE = "\x1b[127;5u";
 
 describe("session selector path/delete interactions", () => {
-	const keybindings = KeybindingsManager.inMemory();
+	const keybindings = new KeybindingsManager();
 
 	beforeEach(() => {
-		// Ensure test isolation: editor keybindings are a global singleton
-		setEditorKeybindings(new EditorKeybindingsManager(DEFAULT_EDITOR_KEYBINDINGS));
+		// Ensure test isolation: keybindings are a global singleton
+		setKeybindings(new KeybindingsManager());
 	});
 
 	beforeAll(() => {

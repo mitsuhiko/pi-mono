@@ -519,6 +519,8 @@ Every `AssistantMessage` includes a `stopReason` field that indicates how the ge
 - `"error"` - An error occurred during generation
 - `"aborted"` - Request was cancelled via abort signal
 
+`AssistantMessage` may also include `responseId`, a provider-specific upstream response or message identifier when the underlying API exposes one. Do not assume it is always present across providers.
+
 ## Error Handling
 
 When a request ends with an error (including aborts and tool call validation errors), the streaming API emits an error event:
@@ -727,6 +729,29 @@ const proxyModel: Model<'anthropic-messages'> = {
 const response = await stream(ollamaModel, context, {
   apiKey: 'dummy' // Ollama doesn't need a real key
 });
+```
+
+Some OpenAI-compatible servers do not understand the `developer` role used for reasoning-capable models. For those providers, set `compat.supportsDeveloperRole` to `false` so the system prompt is sent as a `system` message instead. If the server also does not support `reasoning_effort`, set `compat.supportsReasoningEffort` to `false` too.
+
+This commonly applies to Ollama, vLLM, SGLang, and similar OpenAI-compatible servers. You can set `compat` at the provider level or per model.
+
+```typescript
+const ollamaReasoningModel: Model<'openai-completions'> = {
+  id: 'gpt-oss:20b',
+  name: 'GPT-OSS 20B (Ollama)',
+  api: 'openai-completions',
+  provider: 'ollama',
+  baseUrl: 'http://localhost:11434/v1',
+  reasoning: true,
+  input: ['text'],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 131072,
+  maxTokens: 32000,
+  compat: {
+    supportsDeveloperRole: false,
+    supportsReasoningEffort: false,
+  }
+};
 ```
 
 ### OpenAI Compatibility Settings
@@ -1136,6 +1161,9 @@ Create a new provider file (for example `amazon-bedrock.ts`) that exports:
 #### 3. API Registry Integration (`src/providers/register-builtins.ts`)
 
 - Register the API with `registerApiProvider()`
+- Add a package subpath export in `package.json` for the provider module (`./dist/providers/<provider>.js`)
+- Add lazy loader wrappers in `src/providers/register-builtins.ts`, do not statically import provider implementation modules there
+- Add any root-level `export type` re-exports in `src/index.ts` that should remain available from `@mariozechner/pi-ai`
 - Add credential detection in `env-api-keys.ts` for the new provider
 - Ensure `streamSimple` handles auth lookup via `getEnvApiKey()` or provider-specific auth
 

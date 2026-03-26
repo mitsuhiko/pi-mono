@@ -6,6 +6,18 @@ import assert from "node:assert";
 import { describe, it } from "node:test";
 import { matchesKey, parseKey, setKittyProtocolActive } from "../src/keys.js";
 
+function withEnv(name: string, value: string | undefined, fn: () => void): void {
+	const previous = process.env[name];
+	if (value === undefined) delete process.env[name];
+	else process.env[name] = value;
+	try {
+		fn();
+	} finally {
+		if (previous === undefined) delete process.env[name];
+		else process.env[name] = previous;
+	}
+}
+
 describe("matchesKey", () => {
 	describe("Kitty protocol with alternate keys (non-Latin layouts)", () => {
 		// Kitty protocol flag 4 (Report alternate keys) sends:
@@ -157,6 +169,40 @@ describe("matchesKey", () => {
 			assert.strictEqual(parseKey("\x1b[27;3;13~"), "alt+enter");
 		});
 
+		it("should match xterm modifyOtherKeys Tab variants", () => {
+			setKittyProtocolActive(false);
+			assert.strictEqual(matchesKey("\x1b[27;2;9~", "shift+tab"), true);
+			assert.strictEqual(matchesKey("\x1b[27;5;9~", "ctrl+tab"), true);
+			assert.strictEqual(matchesKey("\x1b[27;3;9~", "alt+tab"), true);
+			assert.strictEqual(parseKey("\x1b[27;2;9~"), "shift+tab");
+			assert.strictEqual(parseKey("\x1b[27;5;9~"), "ctrl+tab");
+			assert.strictEqual(parseKey("\x1b[27;3;9~"), "alt+tab");
+		});
+
+		it("should match xterm modifyOtherKeys Backspace variants", () => {
+			setKittyProtocolActive(false);
+			assert.strictEqual(matchesKey("\x1b[27;1;127~", "backspace"), true);
+			assert.strictEqual(matchesKey("\x1b[27;5;127~", "ctrl+backspace"), true);
+			assert.strictEqual(matchesKey("\x1b[27;3;127~", "alt+backspace"), true);
+			assert.strictEqual(parseKey("\x1b[27;1;127~"), "backspace");
+			assert.strictEqual(parseKey("\x1b[27;5;127~"), "ctrl+backspace");
+			assert.strictEqual(parseKey("\x1b[27;3;127~"), "alt+backspace");
+		});
+
+		it("should match xterm modifyOtherKeys Escape", () => {
+			setKittyProtocolActive(false);
+			assert.strictEqual(matchesKey("\x1b[27;1;27~", "escape"), true);
+			assert.strictEqual(parseKey("\x1b[27;1;27~"), "escape");
+		});
+
+		it("should match xterm modifyOtherKeys Space variants", () => {
+			setKittyProtocolActive(false);
+			assert.strictEqual(matchesKey("\x1b[27;1;32~", "space"), true);
+			assert.strictEqual(matchesKey("\x1b[27;5;32~", "ctrl+space"), true);
+			assert.strictEqual(parseKey("\x1b[27;1;32~"), "space");
+			assert.strictEqual(parseKey("\x1b[27;5;32~"), "ctrl+space");
+		});
+
 		it("should match xterm modifyOtherKeys symbol combos", () => {
 			setKittyProtocolActive(false);
 			assert.strictEqual(matchesKey("\x1b[27;5;47~", "ctrl+/"), true);
@@ -240,6 +286,29 @@ describe("matchesKey", () => {
 			assert.strictEqual(matchesKey("\x1b\x1f", "ctrl+alt+_"), true);
 			assert.strictEqual(matchesKey("\x1b\x1f", "ctrl+alt+-"), true);
 			assert.strictEqual(parseKey("\x1b\x1f"), "ctrl+alt+-");
+		});
+
+		it("should treat raw 0x08 as plain backspace outside Windows Terminal", () => {
+			setKittyProtocolActive(false);
+			withEnv("WT_SESSION", undefined, () => {
+				assert.strictEqual(matchesKey("\x7f", "backspace"), true);
+				assert.strictEqual(matchesKey("\x7f", "ctrl+backspace"), false);
+				assert.strictEqual(parseKey("\x7f"), "backspace");
+				assert.strictEqual(matchesKey("\x08", "backspace"), true);
+				assert.strictEqual(matchesKey("\x08", "ctrl+backspace"), false);
+				assert.strictEqual(parseKey("\x08"), "backspace");
+				assert.strictEqual(matchesKey("\x08", "ctrl+h"), true);
+			});
+		});
+
+		it("should treat raw 0x08 as ctrl+backspace in Windows Terminal", () => {
+			setKittyProtocolActive(false);
+			withEnv("WT_SESSION", "test-session", () => {
+				assert.strictEqual(matchesKey("\x08", "ctrl+backspace"), true);
+				assert.strictEqual(matchesKey("\x08", "backspace"), false);
+				assert.strictEqual(parseKey("\x08"), "ctrl+backspace");
+				assert.strictEqual(matchesKey("\x08", "ctrl+h"), true);
+			});
 		});
 
 		it("should parse legacy alt-prefixed sequences when kitty inactive", () => {

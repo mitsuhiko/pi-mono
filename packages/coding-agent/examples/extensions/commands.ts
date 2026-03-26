@@ -60,10 +60,10 @@ export default function commandsExtension(pi: ExtensionAPI) {
 			if (selected && !selected.startsWith("---")) {
 				const cmdName = selected.split(" - ")[0].slice(1); // Remove leading /
 				const cmd = commands.find((c) => c.name === cmdName);
-				if (cmd?.path) {
-					const showPath = await ctx.ui.confirm(cmd.name, `View source path?\n${cmd.path}`);
+				if (cmd?.sourceInfo.path) {
+					const showPath = await ctx.ui.confirm(cmd.name, `View source path?\n${cmd.sourceInfo.path}`);
 					if (showPath) {
-						ctx.ui.notify(cmd.path, "info");
+						ctx.ui.notify(cmd.sourceInfo.path, "info");
 					}
 				}
 			}

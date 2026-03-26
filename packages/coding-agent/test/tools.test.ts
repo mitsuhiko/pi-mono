@@ -2,7 +2,8 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { bashTool, createBashTool } from "../src/core/tools/bash.js";
+import { executeBash } from "../src/core/bash-executor.js";
+import { bashTool, createBashTool, createLocalBashOperations } from "../src/core/tools/bash.js";
 import { editTool } from "../src/core/tools/edit.js";
 import { findTool } from "../src/core/tools/find.js";
 import { grepTool } from "../src/core/tools/grep.js";
@@ -157,7 +158,7 @@ describe("Coding Agent Tools", () => {
 
 		it("should detect image MIME type from file magic (not extension)", async () => {
 			const png1x1Base64 =
-				"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X2Z0AAAAASUVORK5CYII=";
+				"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==";
 			const pngBuffer = Buffer.from(png1x1Base64, "base64");
 
 			const testFile = join(testDir, "image.txt");
@@ -324,6 +325,26 @@ describe("Coding Agent Tools", () => {
 			const result = await bashWithoutPrefix.execute("test-prefix-3", { command: "echo no-prefix" });
 			expect(getTextOutput(result).trim()).toBe("no-prefix");
 		});
+
+		it("should expose local bash operations for extension reuse", async () => {
+			const ops = createLocalBashOperations();
+			const chunks: Buffer[] = [];
+
+			const result = await ops.exec("echo $TEST_LOCAL_BASH_OPS", testDir, {
+				onData: (data) => chunks.push(data),
+				env: { ...process.env, TEST_LOCAL_BASH_OPS: "from-local-ops" },
+			});
+
+			expect(result.exitCode).toBe(0);
+			expect(Buffer.concat(chunks).toString("utf-8").trim()).toBe("from-local-ops");
+		});
+
+		it("should preserve executeBash sanitization when using local bash operations", async () => {
+			const result = await executeBash("printf '\\033[31mred\\033[0m\\r\\n'");
+
+			expect(result.exitCode).toBe(0);
+			expect(result.output).toBe("red\n");
+		});
 	});
 
 	describe("grep tool", () => {
@@ -440,6 +461,36 @@ describe("edit tool fuzzy matching", () => {
 		expect(getTextOutput(result)).toContain("Successfully replaced");
 		const content = readFileSync(testFile, "utf-8");
 		expect(content).toBe("replaced\nline three\n");
+	});
+
+	it("should match fullwidth punctuation in Chinese text", async () => {
+		const testFile = join(testDir, "chinese-punctuation.txt");
+		writeFileSync(testFile, "你好，世界\n你好（世界）\n");
+
+		const result = await editTool.execute("test-fuzzy-chinese", {
+			path: testFile,
+			oldText: "你好,世界\n你好(世界)\n",
+			newText: "你好，pi\n你好(pi)\n",
+		});
+
+		expect(getTextOutput(result)).toContain("Successfully replaced");
+		const content = readFileSync(testFile, "utf-8");
+		expect(content).toBe("你好，pi\n你好(pi)\n");
+	});
+
+	it("should match compatibility-equivalent Unicode forms", async () => {
+		const testFile = join(testDir, "unicode-compatibility.txt");
+		writeFileSync(testFile, "ＡＢＣ１２３\ncafe\u0301\n");
+
+		const result = await editTool.execute("test-fuzzy-unicode", {
+			path: testFile,
+			oldText: "ABC123\ncafé\n",
+			newText: "XYZ789\ncoffee\n",
+		});
+
+		expect(getTextOutput(result)).toContain("Successfully replaced");
+		const content = readFileSync(testFile, "utf-8");
+		expect(content).toBe("XYZ789\ncoffee\n");
 	});
 
 	it("should match smart single quotes to ASCII quotes", async () => {

@@ -2,6 +2,12 @@
 
 All keyboard shortcuts can be customized via `~/.pi/agent/keybindings.json`. Each action can be bound to one or more keys.
 
+The config file uses the same namespaced keybinding ids that pi uses internally and that extension authors use in `keyHint()` and injected `keybindings` managers.
+
+Older configs using pre-namespaced ids such as `cursorUp` or `expandTools` are migrated automatically to the namespaced ids on startup.
+
+After editing `keybindings.json`, run `/reload` in pi to apply the changes without restarting the session.
+
 ## Key Format
 
 `modifier+key` where modifiers are `ctrl`, `shift`, `alt` (combinable) and keys are:
@@ -16,127 +22,112 @@ Modifier combinations: `ctrl+shift+x`, `alt+ctrl+x`, `ctrl+shift+alt+x`, `ctrl+1
 
 ## All Actions
 
-### Cursor Movement
+### TUI Editor Cursor Movement
 
-| Action | Default | Description |
+| Keybinding id | Default | Description |
 |--------|---------|-------------|
-| `cursorUp` | `up` | Move cursor up |
-| `cursorDown` | `down` | Move cursor down |
-| `cursorLeft` | `left`, `ctrl+b` | Move cursor left |
-| `cursorRight` | `right`, `ctrl+f` | Move cursor right |
-| `cursorWordLeft` | `alt+left`, `ctrl+left`, `alt+b` | Move cursor word left |
-| `cursorWordRight` | `alt+right`, `ctrl+right`, `alt+f` | Move cursor word right |
-| `cursorLineStart` | `home`, `ctrl+a` | Move to line start |
-| `cursorLineEnd` | `end`, `ctrl+e` | Move to line end |
-| `jumpForward` | `ctrl+]` | Jump forward to character |
-| `jumpBackward` | `ctrl+alt+]` | Jump backward to character |
-| `pageUp` | `pageUp` | Scroll up by page |
-| `pageDown` | `pageDown` | Scroll down by page |
+| `tui.editor.cursorUp` | `up` | Move cursor up |
+| `tui.editor.cursorDown` | `down` | Move cursor down |
+| `tui.editor.cursorLeft` | `left`, `ctrl+b` | Move cursor left |
+| `tui.editor.cursorRight` | `right`, `ctrl+f` | Move cursor right |
+| `tui.editor.cursorWordLeft` | `alt+left`, `ctrl+left`, `alt+b` | Move cursor word left |
+| `tui.editor.cursorWordRight` | `alt+right`, `ctrl+right`, `alt+f` | Move cursor word right |
+| `tui.editor.cursorLineStart` | `home`, `ctrl+a` | Move to line start |
+| `tui.editor.cursorLineEnd` | `end`, `ctrl+e` | Move to line end |
+| `tui.editor.jumpForward` | `ctrl+]` | Jump forward to character |
+| `tui.editor.jumpBackward` | `ctrl+alt+]` | Jump backward to character |
+| `tui.editor.pageUp` | `pageUp` | Scroll up by page |
+| `tui.editor.pageDown` | `pageDown` | Scroll down by page |
 
-### Deletion
+### TUI Editor Deletion
 
-| Action | Default | Description |
+| Keybinding id | Default | Description |
 |--------|---------|-------------|
-| `deleteCharBackward` | `backspace` | Delete character backward |
-| `deleteCharForward` | `delete`, `ctrl+d` | Delete character forward |
-| `deleteWordBackward` | `ctrl+w`, `alt+backspace` | Delete word backward |
-| `deleteWordForward` | `alt+d`, `alt+delete` | Delete word forward |
-| `deleteToLineStart` | `ctrl+u` | Delete to line start |
-| `deleteToLineEnd` | `ctrl+k` | Delete to line end |
+| `tui.editor.deleteCharBackward` | `backspace` | Delete character backward |
+| `tui.editor.deleteCharForward` | `delete`, `ctrl+d` | Delete character forward |
+| `tui.editor.deleteWordBackward` | `ctrl+w`, `alt+backspace` | Delete word backward |
+| `tui.editor.deleteWordForward` | `alt+d`, `alt+delete` | Delete word forward |
+| `tui.editor.deleteToLineStart` | `ctrl+u` | Delete to line start |
+| `tui.editor.deleteToLineEnd` | `ctrl+k` | Delete to line end |
 
-### Text Input
+### TUI Input
 
-| Action | Default | Description |
+| Keybinding id | Default | Description |
 |--------|---------|-------------|
-| `newLine` | `shift+enter` | Insert new line |
-| `submit` | `enter` | Submit input |
-| `tab` | `tab` | Tab / autocomplete |
+| `tui.input.newLine` | `shift+enter` | Insert new line |
+| `tui.input.submit` | `enter` | Submit input |
+| `tui.input.tab` | `tab` | Tab / autocomplete |
 
-### Kill Ring
+### TUI Kill Ring
 
-| Action | Default | Description |
+| Keybinding id | Default | Description |
 |--------|---------|-------------|
-| `yank` | `ctrl+y` | Paste most recently deleted text |
-| `yankPop` | `alt+y` | Cycle through deleted text after yank |
-| `undo` | `ctrl+-` | Undo last edit |
+| `tui.editor.yank` | `ctrl+y` | Paste most recently deleted text |
+| `tui.editor.yankPop` | `alt+y` | Cycle through deleted text after yank |
+| `tui.editor.undo` | `ctrl+-` | Undo last edit |
 
-### Clipboard
+### TUI Clipboard and Selection
 
-| Action | Default | Description |
+| Keybinding id | Default | Description |
 |--------|---------|-------------|
-| `copy` | `ctrl+c` | Copy selection |
-| `pasteImage` | `ctrl+v` | Paste image from clipboard |
+| `tui.input.copy` | `ctrl+c` | Copy selection |
+| `tui.select.up` | `up` | Move selection up |
+| `tui.select.down` | `down` | Move selection down |
+| `tui.select.pageUp` | `pageUp` | Page up in list |
+| `tui.select.pageDown` | `pageDown` | Page down in list |
+| `tui.select.confirm` | `enter` | Confirm selection |
+| `tui.select.cancel` | `escape`, `ctrl+c` | Cancel selection |
 
 ### Application
 
-| Action | Default | Description |
+| Keybinding id | Default | Description |
 |--------|---------|-------------|
-| `interrupt` | `escape` | Cancel / abort |
-| `clear` | `ctrl+c` | Clear editor |
-| `exit` | `ctrl+d` | Exit (when editor empty) |
-| `suspend` | `ctrl+z` | Suspend to background |
-| `externalEditor` | `ctrl+g` | Open in external editor (`$VISUAL` or `$EDITOR`) |
+| `app.interrupt` | `escape` | Cancel / abort |
+| `app.clear` | `ctrl+c` | Clear editor |
+| `app.exit` | `ctrl+d` | Exit (when editor empty) |
+| `app.suspend` | `ctrl+z` | Suspend to background |
+| `app.editor.external` | `ctrl+g` | Open in external editor (`$VISUAL` or `$EDITOR`) |
+| `app.clipboard.pasteImage` | `ctrl+v` (`alt+v` on Windows) | Paste image from clipboard |
 
-### Session
+### Sessions
 
-| Action | Default | Description |
+| Keybinding id | Default | Description |
 |--------|---------|-------------|
-| `newSession` | *(none)* | Start a new session (`/new`) |
-| `tree` | *(none)* | Open session tree navigator (`/tree`) |
-| `fork` | *(none)* | Fork current session (`/fork`) |
-| `resume` | *(none)* | Open session resume picker (`/resume`) |
+| `app.session.new` | *(none)* | Start a new session (`/new`) |
+| `app.session.tree` | *(none)* | Open session tree navigator (`/tree`) |
+| `app.session.fork` | *(none)* | Fork current session (`/fork`) |
+| `app.session.resume` | *(none)* | Open session resume picker (`/resume`) |
+| `app.session.togglePath` | `ctrl+p` | Toggle path display |
+| `app.session.toggleSort` | `ctrl+s` | Toggle sort mode |
+| `app.session.toggleNamedFilter` | `ctrl+n` | Toggle named-only filter |
+| `app.session.rename` | `ctrl+r` | Rename session |
+| `app.session.delete` | `ctrl+d` | Delete session |
+| `app.session.deleteNoninvasive` | `ctrl+backspace` | Delete session when query is empty |
 
-### Models & Thinking
+### Models and Thinking
 
-| Action | Default | Description |
+| Keybinding id | Default | Description |
 |--------|---------|-------------|
-| `selectModel` | `ctrl+l` | Open model selector |
-| `cycleModelForward` | `ctrl+p` | Cycle to next model |
-| `cycleModelBackward` | `shift+ctrl+p` | Cycle to previous model |
-| `cycleThinkingLevel` | `shift+tab` | Cycle thinking level |
+| `app.model.select` | `ctrl+l` | Open model selector |
+| `app.model.cycleForward` | `ctrl+p` | Cycle to next model |
+| `app.model.cycleBackward` | `shift+ctrl+p` | Cycle to previous model |
+| `app.thinking.cycle` | `shift+tab` | Cycle thinking level |
+| `app.thinking.toggle` | `ctrl+t` | Collapse or expand thinking blocks |
 
-### Display
+### Display and Message Queue
 
-| Action | Default | Description |
+| Keybinding id | Default | Description |
 |--------|---------|-------------|
-| `expandTools` | `ctrl+o` | Collapse/expand tool output |
-| `toggleThinking` | `ctrl+t` | Collapse/expand thinking blocks |
-
-### Message Queue
-
-| Action | Default | Description |
-|--------|---------|-------------|
-| `followUp` | `alt+enter` | Queue follow-up message |
-| `dequeue` | `alt+up` | Restore queued messages to editor |
-
-### Selection (Lists, Pickers)
-
-| Action | Default | Description |
-|--------|---------|-------------|
-| `selectUp` | `up` | Move selection up |
-| `selectDown` | `down` | Move selection down |
-| `selectPageUp` | `pageUp` | Page up in list |
-| `selectPageDown` | `pageDown` | Page down in list |
-| `selectConfirm` | `enter` | Confirm selection |
-| `selectCancel` | `escape`, `ctrl+c` | Cancel selection |
+| `app.tools.expand` | `ctrl+o` | Collapse or expand tool output |
+| `app.message.followUp` | `alt+enter` | Queue follow-up message |
+| `app.message.dequeue` | `alt+up` | Restore queued messages to editor |
 
 ### Tree Navigation
 
-| Action | Default | Description |
+| Keybinding id | Default | Description |
 |--------|---------|-------------|
-| `treeFoldOrUp` | `ctrl+left`, `alt+left` | Fold current branch segment, or jump to the previous segment start |
-| `treeUnfoldOrDown` | `ctrl+right`, `alt+right` | Unfold current branch segment, or jump to the next segment start or branch end |
-
-### Session Picker
-
-| Action | Default | Description |
-|--------|---------|-------------|
-| `toggleSessionPath` | `ctrl+p` | Toggle path display |
-| `toggleSessionSort` | `ctrl+s` | Toggle sort mode |
-| `toggleSessionNamedFilter` | `ctrl+n` | Toggle named-only filter |
-| `renameSession` | `ctrl+r` | Rename session |
-| `deleteSession` | `ctrl+d` | Delete session |
-| `deleteSessionNoninvasive` | `ctrl+backspace` | Delete session (when query empty) |
+| `app.tree.foldOrUp` | `ctrl+left`, `alt+left` | Fold current branch segment, or jump to the previous segment start |
+| `app.tree.unfoldOrDown` | `ctrl+right`, `alt+right` | Unfold current branch segment, or jump to the next segment start or branch end |
 
 ## Custom Configuration
 
@@ -144,9 +135,9 @@ Create `~/.pi/agent/keybindings.json`:
 
 ```json
 {
-  "cursorUp": ["up", "ctrl+p"],
-  "cursorDown": ["down", "ctrl+n"],
-  "deleteWordBackward": ["ctrl+w", "alt+backspace"]
+  "tui.editor.cursorUp": ["up", "ctrl+p"],
+  "tui.editor.cursorDown": ["down", "ctrl+n"],
+  "tui.editor.deleteWordBackward": ["ctrl+w", "alt+backspace"]
 }
 ```
 
@@ -156,15 +147,15 @@ Each action can have a single key or an array of keys. User config overrides def
 
 ```json
 {
-  "cursorUp": ["up", "ctrl+p"],
-  "cursorDown": ["down", "ctrl+n"],
-  "cursorLeft": ["left", "ctrl+b"],
-  "cursorRight": ["right", "ctrl+f"],
-  "cursorWordLeft": ["alt+left", "alt+b"],
-  "cursorWordRight": ["alt+right", "alt+f"],
-  "deleteCharForward": ["delete", "ctrl+d"],
-  "deleteCharBackward": ["backspace", "ctrl+h"],
-  "newLine": ["shift+enter", "ctrl+j"]
+  "tui.editor.cursorUp": ["up", "ctrl+p"],
+  "tui.editor.cursorDown": ["down", "ctrl+n"],
+  "tui.editor.cursorLeft": ["left", "ctrl+b"],
+  "tui.editor.cursorRight": ["right", "ctrl+f"],
+  "tui.editor.cursorWordLeft": ["alt+left", "alt+b"],
+  "tui.editor.cursorWordRight": ["alt+right", "alt+f"],
+  "tui.editor.deleteCharForward": ["delete", "ctrl+d"],
+  "tui.editor.deleteCharBackward": ["backspace", "ctrl+h"],
+  "tui.input.newLine": ["shift+enter", "ctrl+j"]
 }
 ```
 
@@ -172,11 +163,11 @@ Each action can have a single key or an array of keys. User config overrides def
 
 ```json
 {
-  "cursorUp": ["up", "alt+k"],
-  "cursorDown": ["down", "alt+j"],
-  "cursorLeft": ["left", "alt+h"],
-  "cursorRight": ["right", "alt+l"],
-  "cursorWordLeft": ["alt+left", "alt+b"],
-  "cursorWordRight": ["alt+right", "alt+w"]
+  "tui.editor.cursorUp": ["up", "alt+k"],
+  "tui.editor.cursorDown": ["down", "alt+j"],
+  "tui.editor.cursorLeft": ["left", "alt+h"],
+  "tui.editor.cursorRight": ["right", "alt+l"],
+  "tui.editor.cursorWordLeft": ["alt+left", "alt+b"],
+  "tui.editor.cursorWordRight": ["alt+right", "alt+w"]
 }
 ```

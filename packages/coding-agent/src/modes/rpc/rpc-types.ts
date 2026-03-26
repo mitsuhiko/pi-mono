@@ -10,6 +10,7 @@ import type { ImageContent, Model } from "@mariozechner/pi-ai";
 import type { SessionStats } from "../../core/agent-session.js";
 import type { BashResult } from "../../core/bash-executor.js";
 import type { CompactionResult } from "../../core/compaction/index.js";
+import type { SourceInfo } from "../../core/source-info.js";
 
 // ============================================================================
 // RPC Commands (stdin)
@@ -78,10 +79,8 @@ export interface RpcSlashCommand {
 	description?: string;
 	/** What kind of command this is */
 	source: "extension" | "prompt" | "skill";
-	/** Where the command was loaded from (undefined for extensions) */
-	location?: "user" | "project" | "path";
-	/** File path to the command source */
-	path?: string;
+	/** Source metadata for the owning resource */
+	sourceInfo: SourceInfo;
 }
 
 // ============================================================================

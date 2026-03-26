@@ -3,7 +3,7 @@
  * Displays a list of string options with keyboard navigation.
  */
 
-import { Container, getEditorKeybindings, Spacer, Text, type TUI } from "@mariozechner/pi-tui";
+import { Container, getKeybindings, Spacer, Text, type TUI } from "@mariozechner/pi-tui";
 import { theme } from "../theme/theme.js";
 import { CountdownTimer } from "./countdown-timer.js";
 import { DynamicBorder } from "./dynamic-border.js";
@@ -61,9 +61,9 @@ export class ExtensionSelectorComponent extends Container {
 			new Text(
 				rawKeyHint("↑↓", "navigate") +
 					"  " +
-					keyHint("selectConfirm", "select") +
+					keyHint("tui.select.confirm", "select") +
 					"  " +
-					keyHint("selectCancel", "cancel"),
+					keyHint("tui.select.cancel", "cancel"),
 				1,
 				0,
 			),
@@ -86,17 +86,17 @@ export class ExtensionSelectorComponent extends Container {
 	}
 
 	handleInput(keyData: string): void {
-		const kb = getEditorKeybindings();
-		if (kb.matches(keyData, "selectUp") || keyData === "k") {
+		const kb = getKeybindings();
+		if (kb.matches(keyData, "tui.select.up") || keyData === "k") {
 			this.selectedIndex = Math.max(0, this.selectedIndex - 1);
 			this.updateList();
-		} else if (kb.matches(keyData, "selectDown") || keyData === "j") {
+		} else if (kb.matches(keyData, "tui.select.down") || keyData === "j") {
 			this.selectedIndex = Math.min(this.options.length - 1, this.selectedIndex + 1);
 			this.updateList();
-		} else if (kb.matches(keyData, "selectConfirm") || keyData === "\n") {
+		} else if (kb.matches(keyData, "tui.select.confirm") || keyData === "\n") {
 			const selected = this.options[this.selectedIndex];
 			if (selected) this.onSelectCallback(selected);
-		} else if (kb.matches(keyData, "selectCancel")) {
+		} else if (kb.matches(keyData, "tui.select.cancel")) {
 			this.onCancelCallback();
 		}
 	}

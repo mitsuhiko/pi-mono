@@ -5,6 +5,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "pat
 import { CONFIG_DIR_NAME, getAgentDir } from "../config.js";
 import { parseFrontmatter } from "../utils/frontmatter.js";
 import type { ResourceDiagnostic } from "./diagnostics.js";
+import { createSyntheticSourceInfo, type SourceInfo } from "./source-info.js";
 
 /** Max name length per spec */
 const MAX_NAME_LENGTH = 64;
@@ -75,7 +76,7 @@ export interface Skill {
 	description: string;
 	filePath: string;
 	baseDir: string;
-	source: string;
+	sourceInfo: SourceInfo;
 	disableModelInvocation: boolean;
 }
 
@@ -136,12 +137,37 @@ export interface LoadSkillsFromDirOptions {
 	source: string;
 }
 
+function createSkillSourceInfo(filePath: string, baseDir: string, source: string): SourceInfo {
+	switch (source) {
+		case "user":
+			return createSyntheticSourceInfo(filePath, {
+				source: "local",
+				scope: "user",
+				baseDir,
+			});
+		case "project":
+			return createSyntheticSourceInfo(filePath, {
+				source: "local",
+				scope: "project",
+				baseDir,
+			});
+		case "path":
+			return createSyntheticSourceInfo(filePath, {
+				source: "local",
+				baseDir,
+			});
+		default:
+			return createSyntheticSourceInfo(filePath, { source, baseDir });
+	}
+}
+
 /**
  * Load skills from a directory.
  *
  * Discovery rules:
- * - direct .md children in the root
- * - recursive SKILL.md under subdirectories
+ * - if a directory contains SKILL.md, treat it as a skill root and do not recurse further
+ * - otherwise, load direct .md children in the root
+ * - recurse into subdirectories to find SKILL.md
  */
 export function loadSkillsFromDir(options: LoadSkillsFromDirOptions): LoadSkillsResult {
 	const { dir, source } = options;
@@ -168,6 +194,35 @@ function loadSkillsFromDirInternal(
 
 	try {
 		const entries = readdirSync(dir, { withFileTypes: true });
+
+		for (const entry of entries) {
+			if (entry.name !== "SKILL.md") {
+				continue;
+			}
+
+			const fullPath = join(dir, entry.name);
+
+			let isFile = entry.isFile();
+			if (entry.isSymbolicLink()) {
+				try {
+					isFile = statSync(fullPath).isFile();
+				} catch {
+					continue;
+				}
+			}
+
+			const relPath = toPosixPath(relative(root, fullPath));
+			if (!isFile || ig.ignores(relPath)) {
+				continue;
+			}
+
+			const result = loadSkillFromFile(fullPath, source);
+			if (result.skill) {
+				skills.push(result.skill);
+			}
+			diagnostics.push(...result.diagnostics);
+			return { skills, diagnostics };
+		}
 
 		for (const entry of entries) {
 			if (entry.name.startsWith(".")) {
@@ -208,13 +263,7 @@ function loadSkillsFromDirInternal(
 				continue;
 			}
 
-			if (!isFile) {
-				continue;
-			}
-
-			const isRootMd = includeRootFiles && entry.name.endsWith(".md");
-			const isSkillMd = !includeRootFiles && entry.name === "SKILL.md";
-			if (!isRootMd && !isSkillMd) {
+			if (!isFile || !includeRootFiles || !entry.name.endsWith(".md")) {
 				continue;
 			}
 
@@ -267,7 +316,7 @@ function loadSkillFromFile(
 				description: frontmatter.description,
 				filePath,
 				baseDir: skillDir,
-				source,
+				sourceInfo: createSkillSourceInfo(filePath, skillDir, source),
 				disableModelInvocation: frontmatter["disable-model-invocation"] === true,
 			},
 			diagnostics,

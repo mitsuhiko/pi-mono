@@ -1,4 +1,6 @@
-import { beforeAll, describe, expect, test } from "vitest";
+import { setKeybindings } from "@mariozechner/pi-tui";
+import { beforeAll, beforeEach, describe, expect, test } from "vitest";
+import { KeybindingsManager } from "../src/core/keybindings.js";
 import type {
 	ModelChangeEntry,
 	SessionEntry,
@@ -10,6 +12,11 @@ import { initTheme } from "../src/modes/interactive/theme/theme.js";
 
 beforeAll(() => {
 	initTheme("dark");
+});
+
+beforeEach(() => {
+	// Ensure test isolation: keybindings are a global singleton
+	setKeybindings(new KeybindingsManager());
 });
 
 // Helper to create a user message entry

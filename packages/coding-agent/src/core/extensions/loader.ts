@@ -26,6 +26,7 @@ import * as _bundledPiCodingAgent from "../../index.js";
 import { createEventBus, type EventBus } from "../event-bus.js";
 import type { ExecOptions } from "../exec.js";
 import { execCommand } from "../exec.js";
+import { createSyntheticSourceInfo } from "../source-info.js";
 import type {
 	Extension,
 	ExtensionAPI,
@@ -141,8 +142,8 @@ export function createExtensionRuntime(): ExtensionRuntime {
 		pendingProviderRegistrations: [],
 		// Pre-bind: queue registrations so bindCore() can flush them once the
 		// model registry is available. bindCore() replaces both with direct calls.
-		registerProvider: (name, config) => {
-			runtime.pendingProviderRegistrations.push({ name, config });
+		registerProvider: (name, config, extensionPath = "<unknown>") => {
+			runtime.pendingProviderRegistrations.push({ name, config, extensionPath });
 		},
 		unregisterProvider: (name) => {
 			runtime.pendingProviderRegistrations = runtime.pendingProviderRegistrations.filter((r) => r.name !== name);
@@ -174,13 +175,17 @@ function createExtensionAPI(
 		registerTool(tool: ToolDefinition): void {
 			extension.tools.set(tool.name, {
 				definition: tool,
-				extensionPath: extension.path,
+				sourceInfo: extension.sourceInfo,
 			});
 			runtime.refreshTools();
 		},
 
-		registerCommand(name: string, options: Omit<RegisteredCommand, "name">): void {
-			extension.commands.set(name, { name, ...options });
+		registerCommand(name: string, options: Omit<RegisteredCommand, "name" | "sourceInfo">): void {
+			extension.commands.set(name, {
+				name,
+				sourceInfo: extension.sourceInfo,
+				...options,
+			});
 		},
 
 		registerShortcut(
@@ -271,11 +276,11 @@ function createExtensionAPI(
 		},
 
 		registerProvider(name: string, config: ProviderConfig) {
-			runtime.registerProvider(name, config);
+			runtime.registerProvider(name, config, extension.path);
 		},
 
 		unregisterProvider(name: string) {
-			runtime.unregisterProvider(name);
+			runtime.unregisterProvider(name, extension.path);
 		},
 
 		events: eventBus,
@@ -302,9 +307,16 @@ async function loadExtensionModule(extensionPath: string) {
  * Create an Extension object with empty collections.
  */
 function createExtension(extensionPath: string, resolvedPath: string): Extension {
+	const source =
+		extensionPath.startsWith("<") && extensionPath.endsWith(">")
+			? extensionPath.slice(1, -1).split(":")[0] || "temporary"
+			: "local";
+	const baseDir = extensionPath.startsWith("<") ? undefined : path.dirname(resolvedPath);
+
 	return {
 		path: extensionPath,
 		resolvedPath,
+		sourceInfo: createSyntheticSourceInfo(extensionPath, { source, baseDir }),
 		handlers: new Map(),
 		tools: new Map(),
 		messageRenderers: new Map(),

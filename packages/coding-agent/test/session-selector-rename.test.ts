@@ -1,4 +1,6 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { setKeybindings } from "@mariozechner/pi-tui";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { KeybindingsManager } from "../src/core/keybindings.js";
 import type { SessionInfo } from "../src/core/session-manager.js";
 import { SessionSelectorComponent } from "../src/modes/interactive/components/session-selector.js";
 import { initTheme } from "../src/modes/interactive/theme/theme.js";
@@ -31,8 +33,14 @@ describe("session selector rename", () => {
 		initTheme("dark");
 	});
 
+	beforeEach(() => {
+		// Ensure test isolation: keybindings are a global singleton
+		setKeybindings(new KeybindingsManager());
+	});
+
 	it("shows rename hint in interactive /resume picker configuration", async () => {
 		const sessions = [makeSession({ id: "a" })];
+		const keybindings = new KeybindingsManager();
 		const selector = new SessionSelectorComponent(
 			async () => sessions,
 			async () => [],
@@ -40,7 +48,7 @@ describe("session selector rename", () => {
 			() => {},
 			() => {},
 			() => {},
-			{ showRenameHint: true },
+			{ showRenameHint: true, keybindings },
 		);
 		await flushPromises();
 
@@ -51,6 +59,7 @@ describe("session selector rename", () => {
 
 	it("does not show rename hint in --resume picker configuration", async () => {
 		const sessions = [makeSession({ id: "a" })];
+		const keybindings = new KeybindingsManager();
 		const selector = new SessionSelectorComponent(
 			async () => sessions,
 			async () => [],
@@ -58,7 +67,7 @@ describe("session selector rename", () => {
 			() => {},
 			() => {},
 			() => {},
-			{ showRenameHint: false },
+			{ showRenameHint: false, keybindings },
 		);
 		await flushPromises();
 
@@ -71,6 +80,7 @@ describe("session selector rename", () => {
 		const sessions = [makeSession({ id: "a", name: "Old" })];
 		const renameSession = vi.fn(async () => {});
 
+		const keybindings = new KeybindingsManager();
 		const selector = new SessionSelectorComponent(
 			async () => sessions,
 			async () => [],
@@ -78,7 +88,7 @@ describe("session selector rename", () => {
 			() => {},
 			() => {},
 			() => {},
-			{ renameSession, showRenameHint: true },
+			{ renameSession, showRenameHint: true, keybindings },
 		);
 		await flushPromises();
 

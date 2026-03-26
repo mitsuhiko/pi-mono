@@ -447,6 +447,26 @@ describe("Markdown component", () => {
 			const tableRow = plainLines.find((line) => line.includes("│"));
 			assert.ok(tableRow?.startsWith("  "), "Table should have left padding");
 		});
+
+		it("should not add a trailing blank line when table is the last rendered block", () => {
+			const markdown = new Markdown(
+				`| Name |
+| --- |
+| Alice |`,
+				0,
+				0,
+				defaultMarkdownTheme,
+			);
+
+			const lines = markdown.render(80);
+			const plainLines = lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, "").trimEnd());
+
+			assert.notStrictEqual(
+				plainLines.at(-1),
+				"",
+				`Expected table to end without a blank line: ${JSON.stringify(plainLines)}`,
+			);
+		});
 	});
 
 	describe("Combined features", () => {
@@ -601,6 +621,52 @@ again, hello world`,
 				`Expected 1 empty line after code block, but found ${emptyLineCount}. Lines after backticks: ${JSON.stringify(afterBackticks.slice(0, 5))}`,
 			);
 		});
+
+		it("should normalize paragraph and code block spacing to one blank line", () => {
+			const cases = [
+				`hello this is text
+\`\`\`
+code block
+\`\`\`
+more text`,
+				`hello this is text
+
+\`\`\`
+code block
+\`\`\`
+
+more text`,
+			];
+			const expectedLines = ["hello this is text", "", "```", "  code block", "```", "", "more text"];
+
+			for (const text of cases) {
+				const markdown = new Markdown(text, 0, 0, defaultMarkdownTheme);
+				const lines = markdown.render(80);
+				const plainLines = lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, "").trimEnd());
+
+				assert.deepStrictEqual(
+					plainLines,
+					expectedLines,
+					`Unexpected spacing for markdown: ${JSON.stringify(text)}`,
+				);
+			}
+		});
+
+		it("should not add a trailing blank line when code block is the last rendered block", () => {
+			const cases = ["```js\nconst hello = 'world';\n```", "hello world\n\n```js\nconst hello = 'world';\n```"];
+
+			for (const text of cases) {
+				const markdown = new Markdown(text, 0, 0, defaultMarkdownTheme);
+				const lines = markdown.render(80);
+				const plainLines = lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, "").trimEnd());
+
+				assert.notStrictEqual(
+					plainLines.at(-1),
+					"",
+					`Expected code block to end without a blank line: ${JSON.stringify(plainLines)}`,
+				);
+			}
+		});
 	});
 
 	describe("Spacing after dividers", () => {
@@ -631,6 +697,18 @@ again, hello world`,
 				`Expected 1 empty line after divider, but found ${emptyLineCount}. Lines after divider: ${JSON.stringify(afterDivider.slice(0, 5))}`,
 			);
 		});
+
+		it("should not add a trailing blank line when divider is the last rendered block", () => {
+			const markdown = new Markdown("---", 0, 0, defaultMarkdownTheme);
+			const lines = markdown.render(80);
+			const plainLines = lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, "").trimEnd());
+
+			assert.notStrictEqual(
+				plainLines.at(-1),
+				"",
+				`Expected divider to end without a blank line: ${JSON.stringify(plainLines)}`,
+			);
+		});
 	});
 
 	describe("Spacing after headings", () => {
@@ -657,6 +735,18 @@ This is a paragraph`,
 				emptyLineCount,
 				1,
 				`Expected 1 empty line after heading, but found ${emptyLineCount}. Lines after heading: ${JSON.stringify(afterHeading.slice(0, 5))}`,
+			);
+		});
+
+		it("should not add a trailing blank line when heading is the last rendered block", () => {
+			const markdown = new Markdown("# Hello", 0, 0, defaultMarkdownTheme);
+			const lines = markdown.render(80);
+			const plainLines = lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, "").trimEnd());
+
+			assert.notStrictEqual(
+				plainLines.at(-1),
+				"",
+				`Expected heading to end without a blank line: ${JSON.stringify(plainLines)}`,
 			);
 		});
 	});
@@ -687,6 +777,18 @@ again, hello world`,
 				emptyLineCount,
 				1,
 				`Expected 1 empty line after blockquote, but found ${emptyLineCount}. Lines after quote: ${JSON.stringify(afterQuote.slice(0, 5))}`,
+			);
+		});
+
+		it("should not add a trailing blank line when blockquote is the last rendered block", () => {
+			const markdown = new Markdown("> This is a quote", 0, 0, defaultMarkdownTheme);
+			const lines = markdown.render(80);
+			const plainLines = lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, "").trimEnd());
+
+			assert.notStrictEqual(
+				plainLines.at(-1),
+				"",
+				`Expected blockquote to end without a blank line: ${JSON.stringify(plainLines)}`,
 			);
 		});
 	});
@@ -865,6 +967,67 @@ bar`,
 
 			// Should have italic from quote styling (\x1b[3m)
 			assert.ok(allOutput.includes("\x1b[3m"), "Should have italic from quote styling");
+		});
+	});
+
+	describe("Heading with inline code", () => {
+		it("should preserve heading styling after inline code", () => {
+			const markdown = new Markdown("### Why `sourceInfo` should not be optional", 0, 0, defaultMarkdownTheme);
+
+			const lines = markdown.render(80);
+			const joinedOutput = lines.join("\n");
+
+			// The heading theme is bold+cyan. After the yellow inline code, the heading
+			// styling (bold+cyan) must be restored so subsequent text is styled correctly.
+			// bold = \x1b[1m, cyan = \x1b[36m, yellow = \x1b[33m
+			assert.ok(joinedOutput.includes("\x1b[33m"), "Should have yellow for inline code");
+
+			// Find the position of "should not be optional" in the raw output.
+			// It must be preceded by heading style codes (bold+cyan), not appear unstyled.
+			const afterCodeIndex = joinedOutput.indexOf("should not be optional");
+			assert.ok(afterCodeIndex > 0, "Should contain text after inline code");
+
+			// Look at the ANSI codes between the code span end and "should not be optional".
+			// There should be bold (\x1b[1m) and cyan (\x1b[36m) re-applied.
+			const precedingChunk = joinedOutput.slice(Math.max(0, afterCodeIndex - 40), afterCodeIndex);
+			assert.ok(
+				precedingChunk.includes("\x1b[1m"),
+				`Should re-apply bold before text after code: ${precedingChunk}`,
+			);
+			assert.ok(
+				precedingChunk.includes("\x1b[36m"),
+				`Should re-apply cyan before text after code: ${precedingChunk}`,
+			);
+		});
+
+		it("should preserve heading styling after inline code for h1", () => {
+			const markdown = new Markdown("# Title with `code` inside", 0, 0, defaultMarkdownTheme);
+
+			const lines = markdown.render(80);
+			const joinedOutput = lines.join("\n");
+
+			const afterCodeIndex = joinedOutput.indexOf("inside");
+			assert.ok(afterCodeIndex > 0, "Should contain text after inline code");
+
+			const precedingChunk = joinedOutput.slice(Math.max(0, afterCodeIndex - 40), afterCodeIndex);
+			// H1 uses heading + bold + underline
+			assert.ok(precedingChunk.includes("\x1b[1m"), `Should re-apply bold for h1: ${precedingChunk}`);
+			assert.ok(precedingChunk.includes("\x1b[36m"), `Should re-apply cyan for h1: ${precedingChunk}`);
+			assert.ok(precedingChunk.includes("\x1b[4m"), `Should re-apply underline for h1: ${precedingChunk}`);
+		});
+
+		it("should preserve heading styling after bold text", () => {
+			const markdown = new Markdown("## Heading with **bold** and more", 0, 0, defaultMarkdownTheme);
+
+			const lines = markdown.render(80);
+			const joinedOutput = lines.join("\n");
+
+			const afterBoldIndex = joinedOutput.indexOf("and more");
+			assert.ok(afterBoldIndex > 0, "Should contain text after bold");
+
+			const precedingChunk = joinedOutput.slice(Math.max(0, afterBoldIndex - 40), afterBoldIndex);
+			assert.ok(precedingChunk.includes("\x1b[1m"), `Should re-apply bold for h2: ${precedingChunk}`);
+			assert.ok(precedingChunk.includes("\x1b[36m"), `Should re-apply cyan for h2: ${precedingChunk}`);
 		});
 	});
 

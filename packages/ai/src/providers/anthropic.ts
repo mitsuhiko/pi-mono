@@ -62,7 +62,7 @@ function getCacheControl(
 }
 
 // Stealth mode: Mimic Claude Code's tool naming exactly
-const claudeCodeVersion = "2.1.62";
+const claudeCodeVersion = "2.1.75";
 
 // Claude Code 2.x tool names (canonical casing)
 // Source: https://cchistory.mariozechner.at/data/prompts-2.1.11.md
@@ -178,6 +178,12 @@ export interface AnthropicOptions extends StreamOptions {
 	effort?: AnthropicEffort;
 	interleavedThinking?: boolean;
 	toolChoice?: "auto" | "any" | "none" | { type: "tool"; name: string };
+	/**
+	 * Pre-built Anthropic client instance. When provided, skips internal client
+	 * construction entirely. Use this to inject alternative SDK clients such as
+	 * `AnthropicVertex` that shares the same messaging API.
+	 */
+	client?: Anthropic;
 }
 
 function mergeHeaders(...headerSources: (Record<string, string> | undefined)[]): Record<string, string> {
@@ -217,25 +223,35 @@ export const streamAnthropic: StreamFunction<"anthropic-messages", AnthropicOpti
 		};
 
 		try {
-			const apiKey = options?.apiKey ?? getEnvApiKey(model.provider) ?? "";
+			let client: Anthropic;
+			let isOAuth: boolean;
 
-			let copilotDynamicHeaders: Record<string, string> | undefined;
-			if (model.provider === "github-copilot") {
-				const hasImages = hasCopilotVisionInput(context.messages);
-				copilotDynamicHeaders = buildCopilotDynamicHeaders({
-					messages: context.messages,
-					hasImages,
-				});
+			if (options?.client) {
+				client = options.client;
+				isOAuth = false;
+			} else {
+				const apiKey = options?.apiKey ?? getEnvApiKey(model.provider) ?? "";
+
+				let copilotDynamicHeaders: Record<string, string> | undefined;
+				if (model.provider === "github-copilot") {
+					const hasImages = hasCopilotVisionInput(context.messages);
+					copilotDynamicHeaders = buildCopilotDynamicHeaders({
+						messages: context.messages,
+						hasImages,
+					});
+				}
+
+				const created = createClient(
+					model,
+					apiKey,
+					options?.interleavedThinking ?? true,
+					options?.headers,
+					copilotDynamicHeaders,
+				);
+				client = created.client;
+				isOAuth = created.isOAuthToken;
 			}
-
-			const { client, isOAuthToken } = createClient(
-				model,
-				apiKey,
-				options?.interleavedThinking ?? true,
-				options?.headers,
-				copilotDynamicHeaders,
-			);
-			let params = buildParams(model, context, isOAuthToken, options);
+			let params = buildParams(model, context, isOAuth, options);
 			const nextParams = await options?.onPayload?.(params, model);
 			if (nextParams !== undefined) {
 				params = nextParams as MessageCreateParamsStreaming;
@@ -248,6 +264,7 @@ export const streamAnthropic: StreamFunction<"anthropic-messages", AnthropicOpti
 
 			for await (const event of anthropicStream) {
 				if (event.type === "message_start") {
+					output.responseId = event.message.id;
 					// Capture initial token usage from message_start event
 					// This ensures we have input token counts even if the stream is aborted early
 					output.usage.input = event.message.usage.input_tokens || 0;
@@ -290,7 +307,7 @@ export const streamAnthropic: StreamFunction<"anthropic-messages", AnthropicOpti
 						const block: Block = {
 							type: "toolCall",
 							id: event.content_block.id,
-							name: isOAuthToken
+							name: isOAuth
 								? fromClaudeCodeName(event.content_block.name, context.tools)
 								: event.content_block.name,
 							arguments: (event.content_block.input as Record<string, any>) ?? {},
@@ -637,20 +654,25 @@ function buildParams(
 		params.tools = convertTools(context.tools, isOAuthToken);
 	}
 
-	// Configure thinking mode: adaptive (Opus 4.6 and Sonnet 4.6) or budget-based (older models)
-	if (options?.thinkingEnabled && model.reasoning) {
-		if (supportsAdaptiveThinking(model.id)) {
-			// Adaptive thinking: Claude decides when and how much to think
-			params.thinking = { type: "adaptive" };
-			if (options.effort) {
-				params.output_config = { effort: options.effort };
+	// Configure thinking mode: adaptive (Opus 4.6 and Sonnet 4.6),
+	// budget-based (older models), or explicitly disabled.
+	if (model.reasoning) {
+		if (options?.thinkingEnabled) {
+			if (supportsAdaptiveThinking(model.id)) {
+				// Adaptive thinking: Claude decides when and how much to think
+				params.thinking = { type: "adaptive" };
+				if (options.effort) {
+					params.output_config = { effort: options.effort };
+				}
+			} else {
+				// Budget-based thinking for older models
+				params.thinking = {
+					type: "enabled",
+					budget_tokens: options.thinkingBudgetTokens || 1024,
+				};
 			}
-		} else {
-			// Budget-based thinking for older models
-			params.thinking = {
-				type: "enabled",
-				budget_tokens: options.thinkingBudgetTokens || 1024,
-			};
+		} else if (options?.thinkingEnabled === false) {
+			params.thinking = { type: "disabled" };
 		}
 	}
 

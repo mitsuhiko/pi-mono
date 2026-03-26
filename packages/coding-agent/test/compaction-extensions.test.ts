@@ -20,6 +20,7 @@ import {
 import { ModelRegistry } from "../src/core/model-registry.js";
 import { SessionManager } from "../src/core/session-manager.js";
 import { SettingsManager } from "../src/core/settings-manager.js";
+import { createSyntheticSourceInfo } from "../src/core/source-info.js";
 import { codingTools } from "../src/core/tools/index.js";
 import { createTestResourceLoader } from "./utilities.js";
 
@@ -74,6 +75,7 @@ describe.skipIf(!API_KEY)("Compaction extensions", () => {
 		return {
 			path: "test-extension",
 			resolvedPath: "/test/test-extension.ts",
+			sourceInfo: createSyntheticSourceInfo("<test:test-extension>", { source: "test" }),
 			handlers,
 			tools: new Map(),
 			messageRenderers: new Map(),
@@ -228,6 +230,7 @@ describe.skipIf(!API_KEY)("Compaction extensions", () => {
 		const throwingExtension: Extension = {
 			path: "throwing-extension",
 			resolvedPath: "/test/throwing-extension.ts",
+			sourceInfo: createSyntheticSourceInfo("<test:throwing-extension>", { source: "test" }),
 			handlers: new Map<string, ((event: any, ctx: any) => Promise<any>)[]>([
 				[
 					"session_before_compact",
@@ -276,6 +279,7 @@ describe.skipIf(!API_KEY)("Compaction extensions", () => {
 		const extension1: Extension = {
 			path: "extension1",
 			resolvedPath: "/test/extension1.ts",
+			sourceInfo: createSyntheticSourceInfo("<test:extension1>", { source: "test" }),
 			handlers: new Map<string, ((event: any, ctx: any) => Promise<any>)[]>([
 				[
 					"session_before_compact",
@@ -306,6 +310,7 @@ describe.skipIf(!API_KEY)("Compaction extensions", () => {
 		const extension2: Extension = {
 			path: "extension2",
 			resolvedPath: "/test/extension2.ts",
+			sourceInfo: createSyntheticSourceInfo("<test:extension2>", { source: "test" }),
 			handlers: new Map<string, ((event: any, ctx: any) => Promise<any>)[]>([
 				[
 					"session_before_compact",
